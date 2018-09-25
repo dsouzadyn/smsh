@@ -24,29 +24,35 @@ impl ShellCommand {
     }
 
     fn execute(&self, args: Vec<&str>) {
-        if self.command_type == CommandType::INBUILT {
-            let child = Command::new(&self.name).args(args.iter()).spawn().expect("could not spawn process");
-            let output = child.wait_with_output().expect("Oops something went wrong");
-            
-            print!("{}", String::from_utf8_lossy(&output.stdout));
-            print!("{}", String::from_utf8_lossy(&output.stderr));
-        } else {
-            std::process::exit(0x0000);
-        }
+        let child = Command::new(&self.name).args(args.iter()).spawn().expect("could not spawn process");
+        let output = child.wait_with_output().expect("Oops something went wrong");
+
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+        print!("{}", String::from_utf8_lossy(&output.stderr));
     }
+}
+
+fn exit() {
+    std::process::exit(0x0000);
 }
 
 fn process(buf: String, stdout: &mut io::Stdout, commands: &HashMap<&str, ShellCommand>) {
     let tokens: Vec<&str> = buf.trim()
         .split(' ').collect();
     let command = commands.get(tokens[0]);
-    
+
     if command.is_none() != true {
-        command.unwrap().execute(tokens[1..].to_vec());
+        let comm = command.unwrap();
+        match comm.command_type {
+            CommandType::INBUILT => comm.execute(tokens[1..].to_vec()),
+            CommandType::CUSTOM => {
+                if comm.name == "exit" { exit() };
+            },
+        }
     } else {
         print!("Error: No such command exists!\n");
     }
-    
+
     flush(stdout);
 }
 
@@ -54,7 +60,7 @@ fn shell_loop() {
     let stdin = io::stdin();
     let mut stdout = io::stdout();
     let mut shell_commands: HashMap<&str, ShellCommand> = HashMap::new();
-   
+
     shell_commands.insert("clear", ShellCommand::new("clear", CommandType::INBUILT));
     shell_commands.insert("ls", ShellCommand::new("ls", CommandType::INBUILT));
     shell_commands.insert("exit", ShellCommand::new("exit", CommandType::CUSTOM));
